@@ -523,11 +523,58 @@ function parseln(ln) {
 
       if (subVal.type === 'num') {
         memory.write(subVal.val, memory.read(subVal.val) - subOS);
+        break;
       } else if (subVal.type === 'reg') {
         regsys.change(subVal.val, regsys.fetch(subVal.val) - subOS);
+        break;
       }
       break;
 
+    case "mul":
+      if (ops.length !== 2) err("Expected 2 arguments");
+
+      const [mulVal, mulSrc] = ops;
+      let mulOS
+
+      if (mulSrc.type === 'num') {
+        mulOS = mulSrc.val;
+      } else if (mulSrc.type === 'reg') {
+        err("Cannot pass Register Names as values");
+      } else {
+        err("Cannot accept values of invalid types for multiplication");
+      }
+
+      if (mulVal.type === 'num') {
+        memory.write(mulVal.val, memory.read(mulVal.val) * mulOS);
+        break;
+      } else if (mulVal.type === 'reg') {
+        regsys.change(mulVal.val, regsys.fetch(mulVal.val) * mulOS);
+        break;
+      }
+      break;
+
+    case "div":
+      if (ops.length !== 2) err("Expected 2 arguments");
+
+      const [divVal, divSrc] = ops;
+      let divOS
+
+      if (divSrc.type === 'num') {
+        divOS = divSrc.val;
+      } else if (divSrc.type === 'reg') {
+        err("Cannot pass Register Names as values");
+      } else {
+        err("Cannot accept values of invalid types for multiplication");
+      }
+
+      if (divVal.type === 'num') {
+        memory.write(divVal.val, memory.read(divVal.val) / divOS);
+        break;
+      } else if (divVal.type === 'reg') {
+        regsys.change(divVal.val, regsys.fetch(divVal.val) / divOS);
+        break;
+      }
+      break;
     case ";" + sec[0]?.substring(1):
       break;
 
@@ -536,4 +583,11 @@ function parseln(ln) {
   }
 }
 
+while (true) {
+  const theln = prompt(">");
+  if (theln == '..') break;
+  parseln(theln);
+}
+
 /* END OF FILE */
+
