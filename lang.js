@@ -583,11 +583,4 @@ function parseln(ln) {
   }
 }
 
-while (true) {
-  const theln = prompt(">");
-  if (theln == '..') break;
-  parseln(theln);
-}
-
 /* END OF FILE */
-
