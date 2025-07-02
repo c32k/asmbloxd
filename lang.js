@@ -6,15 +6,19 @@
 */
 
 const MEM_SIZE = 4096; // 4096 Bytes
-const REG_SIZE = 16; // 8 Registers, 512 Bytes
+const REG_SIZE = (16 - 2); // 16 Registers (2 for Floating Point Storage)
 const STACK_END = MEM_SIZE - MEM_SIZE / 4 // Stack limit at 1KB
 const mem = new Uint8Array(MEM_SIZE);
+
 const reg = new Int32Array(REG_SIZE);
+const reg_math = new Float32Array(2);
+
 
 reg[REG_SIZE - 1] = MEM_SIZE; // Stack grows downward
 
 const memref = {}; // Store references
 let lastPushedString;
+let lsetregz;
 
 const types = {
   'BIT': 1,
@@ -146,6 +150,84 @@ function smartSplit(input) {
     }
   }
   return result;
+}
+
+function performMathOp(ophold, mathop) {
+  const binaryOps = ['+', '-', '*', '/'];
+  const unaryOps = ['sin', 'cos', 'tan', 'sqrt'];
+
+  const oVal = ophold[0];
+  const adrval = (() => {
+    if (oVal.type === 'num') return memory.read(oVal.val);
+    else if (oVal.type === 'reg') return regsys.fetch(oVal.val);
+    else err("Cannot change value of unrecognized address");
+  })();
+
+  if (ophold.length == 1 && unaryOps.includes(mathop)) { // Complex math
+    let result;
+    switch (mathop) {
+      case 'sin':
+        result = Math.sin(adrval);
+        break;
+      case 'cos':
+        result = Math.cos(adrval);
+        break;
+      case 'tan':
+        result = Math.tan(adrval);
+        break;
+      case 'sqrt':
+        result = Math.sqrt(adrval);
+        break;
+      default:
+        err("Cannot recognize Operator Instruction");
+        break;
+    }
+    if (lsetregz === false || typeof lsetregz === 'undefined') {
+      reg_math[0] = result;
+      log("Value stored in Math Register 1, access with RM1");
+      return;
+    } else {
+      reg_math[1] = result;
+      log("Value stored in Math Register 2, access with RM2");
+      return;
+    }
+
+  } else if (ophold.length == 2 && binaryOps.includes(mathop)) { // Simple Ops
+    const oSrc = ophold[1];
+    const offset = (() => {
+      if (oSrc.type == 'num') return oSrc.val;
+      else err("Incorrect offset passed");
+    })();
+
+    let result;
+
+    switch (mathop) {
+      case '+':
+        result = adrval + offset;
+        break;
+      case '-':
+        result = adrval - offset;
+        break;
+      case '*':
+        result = adrval * offset;
+        break;
+      case '/':
+        result = adrval / offset;
+        break;
+      default:
+        err("Cannot recognize Operator Instruction");
+        break;
+    }
+
+    if (oVal.type === 'num') {
+      memory.write(oVal.val, result);
+    } else if (oVal.type === 'reg') {
+      regsys.change(oVal.val, result);
+    }
+  } else {
+    err("Operation and Operand Length do not match.");
+  }
+
 }
 
 class Stack {
@@ -300,6 +382,10 @@ class RegisterSystem {
         return reg[REG_SIZE - 1];
       case 'RFLAGS':
         return reg[REG_SIZE - 2];
+      case 'RM1':
+        return reg_math[0];
+      case 'RM2':
+        return reg_math[1];
     }
 
     let num = register.replace('R', '');
@@ -485,99 +571,32 @@ function parseln(ln) {
       break;
 
     case "add":
-      if (ops.length !== 2) err("Expected 2 arguments");
-
-      const [addVal, addSrc] = ops;
-      let addOS;
-
-      if (addSrc.type === 'num') {
-        addOS = addSrc.val
-      } else if (addSrc.type === 'str') {
-        err("Cannot add strings");
-      } else if (addSrc.type === 'reg') {
-        err("Cannot pass Register Names as offsets");
-      } else {
-        err("Unnacceptable addition offset");
-      }
-
-      if (addVal.type === 'num') {
-        memory.write(addVal.val, memory.read(addVal.val) + addOS);
-      } else if (addVal.type === 'reg') {
-        regsys.change(addVal.val, regsys.fetch(addVal.val) + addOS);
-      }
+      performMathOp(ops, '+')
       break;
-
     case "sub":
-      if (ops.length !== 2) err("Expected 2 arguments");
-
-      const [subVal, subSrc] = ops;
-      let subOS;
-
-      if (subSrc.type === 'num') {
-        subOS = subSrc.val;
-      } else if (subSrc.type === 'reg') {
-        err("Cannot pass Register Names as offsets");
-      } else {
-        err("Unnacceptable subtraction offset");
-      }
-
-      if (subVal.type === 'num') {
-        memory.write(subVal.val, memory.read(subVal.val) - subOS);
-        break;
-      } else if (subVal.type === 'reg') {
-        regsys.change(subVal.val, regsys.fetch(subVal.val) - subOS);
-        break;
-      }
+      performMathOp(ops, '-')
       break;
-
     case "mul":
-      if (ops.length !== 2) err("Expected 2 arguments");
-
-      const [mulVal, mulSrc] = ops;
-      let mulOS
-
-      if (mulSrc.type === 'num') {
-        mulOS = mulSrc.val;
-      } else if (mulSrc.type === 'reg') {
-        err("Cannot pass Register Names as values");
-      } else {
-        err("Cannot accept values of invalid types for multiplication");
-      }
-
-      if (mulVal.type === 'num') {
-        memory.write(mulVal.val, memory.read(mulVal.val) * mulOS);
-        break;
-      } else if (mulVal.type === 'reg') {
-        regsys.change(mulVal.val, regsys.fetch(mulVal.val) * mulOS);
-        break;
-      }
+      performMathOp(ops, '*');
       break;
-
     case "div":
-      if (ops.length !== 2) err("Expected 2 arguments");
-
-      const [divVal, divSrc] = ops;
-      let divOS
-
-      if (divSrc.type === 'num') {
-        divOS = divSrc.val;
-      } else if (divSrc.type === 'reg') {
-        err("Cannot pass Register Names as values");
-      } else {
-        err("Cannot accept values of invalid types for multiplication");
-      }
-
-      if (divVal.type === 'num') {
-        memory.write(divVal.val, memory.read(divVal.val) / divOS);
-        break;
-      } else if (divVal.type === 'reg') {
-        regsys.change(divVal.val, regsys.fetch(divVal.val) / divOS);
-        break;
-      }
+      performMathOp(ops, '/');
       break;
+    case "sin":
+      performMathOp(ops, 'sin');
+      break;
+    case "cos":
+      performMathOp(ops, 'cos');
+      break;
+    case "tan":
+      performMathOp(ops, 'tan');
+      break;
+    case "sqrt":
+      performMathOp(ops, 'sqrt');
+      break;
+
     case ";" + sec[0]?.substring(1):
       break;
-
     default:
       err(`Unrecognized instruction "${instr}"`);
   }
