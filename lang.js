@@ -7,7 +7,7 @@
 
 const MEM_SIZE = 4096; // 4096 Bytes
 const REG_SIZE = (16 - 2); // 16 Registers (2 for Floating Point Storage)
-const STACK_END = MEM_SIZE - MEM_SIZE / 4 // Stack limit at 1KB
+const STACK_END = MEM_SIZE - MEM_SIZE / 4; // Stack limit at 1KB
 const mem = new Uint8Array(MEM_SIZE);
 
 const reg = new Int32Array(REG_SIZE);
@@ -361,7 +361,7 @@ class Memory {
     const str = [];
     for (let i = 0; mem[adr + i] != 0; i++) {
       if (adr + i > STACK_END) err("Could not find null terminator");
-      str.push(String.fromCharCode(parseInt(mem[adr + i], 2)));
+      str.push(String.fromCharCode(mem[adr + i]));
     }
   }
 }
